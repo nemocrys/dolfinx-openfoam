@@ -26,10 +26,30 @@ RUN pip3 install \
         pandas==1.2.*\
         pyyaml==5.4.*
 
+# install dependencies
+RUN apt-get -qq update && apt-get -qq install \
+   software-properties-common \
+   wget apt-transport-https && \
+   rm -rf /var/lib/apt/lists/*
+
+# disables cache (I think); this was in the DOckerfile.openfoam-adapter; not sure if needed
+# ARG CACHEBUST
+
+SHELL ["/bin/bash", "-c"]
+
 # install openFOAM
-
+# see https://github.com/precice/openfoam-adapter/wiki/Notes-on-OpenFOAM#get-openfoam
+# Add the signing key, add the repository, add ca-certificates (because...), update, install:
+RUN wget -q -O - https://dl.openfoam.com/add-debian-repo.sh | bash && \
+        apt-get install -y ca-certificates
+        
+RUN apt-get update && \ 
+        apt-get install -y openfoam2106-dev && \
+        source /usr/lib/openfoam/openfoam2106/etc/bashrc
+        
 # Install preCICE
-
+#RUN wget https://github.com/precice/precice/releases/download/v2.3.0/libprecice2_2.3.0_focal.deb && \
+#        apt install ./libprecice2_2.3.0_focal.deb
 
 
 RUN mkdir /home/workdir
@@ -38,5 +58,5 @@ WORKDIR /home/workdir
 # modify user id and group
 # see https://techflare.blog/permission-problems-in-bind-mount-in-docker-volume/
 COPY  ./docker/entrypoint.sh /
-RUN apt-get -y install gosu 
-ENTRYPOINT [ "/entrypoint.sh" ]
+# RUN apt-get -y install gosu 
+#ENTRYPOINT [ "/entrypoint.sh" ]
