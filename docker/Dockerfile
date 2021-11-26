@@ -46,11 +46,15 @@ RUN wget -q -O - https://dl.openfoam.com/add-debian-repo.sh | bash && \
 RUN apt-get update && \ 
         apt-get install -y openfoam2106-dev && \
         source /usr/lib/openfoam/openfoam2106/etc/bashrc
-        
-# Install preCICE
-#RUN wget https://github.com/precice/precice/releases/download/v2.3.0/libprecice2_2.3.0_focal.deb && \
-#        apt install ./libprecice2_2.3.0_focal.deb
 
+# Install preCICE
+RUN wget https://github.com/precice/precice/releases/download/v2.3.0/libprecice2_2.3.0_focal.deb && \
+        apt install -y ./libprecice2_2.3.0_focal.deb
+
+# Install OpenFoam Adapter
+RUN wget https://github.com/precice/openfoam-adapter/releases/download/v1.0.0/openfoam-adapter_v1.0.0_OpenFOAMv1812-v2106.tar.gz && \
+        cd openfoam-adapter_v1.0.0_OpenFOAMv1812-v2012 && \
+        ./Allwmake
 
 RUN mkdir /home/workdir
 WORKDIR /home/workdir
@@ -58,5 +62,5 @@ WORKDIR /home/workdir
 # modify user id and group
 # see https://techflare.blog/permission-problems-in-bind-mount-in-docker-volume/
 COPY  ./docker/entrypoint.sh /
-# RUN apt-get -y install gosu 
-#ENTRYPOINT [ "/entrypoint.sh" ]
+RUN apt-get -y install gosu 
+ENTRYPOINT [ "/entrypoint.sh" ]
