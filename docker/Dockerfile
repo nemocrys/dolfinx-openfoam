@@ -52,7 +52,8 @@ RUN wget https://github.com/precice/precice/releases/download/v2.3.0/libprecice2
         apt install -y ./libprecice2_2.3.0_focal.deb
 
 # Install OpenFoam Adapter
-RUN wget https://github.com/precice/openfoam-adapter/releases/download/v1.0.0/openfoam-adapter_v1.0.0_OpenFOAMv1812-v2106.tar.gz && \
+RUN source /usr/lib/openfoam/openfoam2106/etc/bashrc && \
+        wget https://github.com/precice/openfoam-adapter/releases/download/v1.0.0/openfoam-adapter_v1.0.0_OpenFOAMv1812-v2106.tar.gz && \
         cd openfoam-adapter_v1.0.0_OpenFOAMv1812-v2012 && \
         ./Allwmake
 
