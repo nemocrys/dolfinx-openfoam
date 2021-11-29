@@ -11,19 +11,18 @@ Solid plate participant in flow-over-plate tutorial using FEniCS
 
 from mpi4py import MPI
 from dolfinx import Function, FunctionSpace, VectorFunctionSpace, Constant, DirichletBC
-from dolfinx.fem import LinearProblem
+from dolfinx.fem import LinearProblem, locate_dofs_geometrical
 from dolfinx.generation import RectangleMesh
-# from dolfinx.mesh import CellType  # TODO this should work according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/diffusion_code.html?highlight=rectangular
+# from dolfinx.mesh import CellType  # this should work according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/diffusion_code.html?highlight=rectangular
 from dolfinx.io import XDMFFile
 
-from ufl import TrialFunction, TestFunction, grad, inner, dot, dx
+from ufl import FiniteElement, VectorElement, TrialFunction, TestFunction, grad, inner, dot, dx
 # from dolfinx import interpolate, near, MeshFunction, rhs, lhs
 
 # from fenicsprecice import Adapter
 import numpy as np
 
 
-# TODO
 # class ComplementaryBoundary(SubDomain):
 #     """Determines if a point is at the complementary boundary with tolerance of
 #     1E-14.
@@ -42,8 +41,6 @@ import numpy as np
 #         else:
 #             return False
 
-
-# TODO
 # class TopBoundary(SubDomain):
 #     """Determines if the point is at the top boundary with tolerance of 1E-14.
 #     :func inside(): returns True if point belongs to the boundary, otherwise
@@ -56,9 +53,11 @@ import numpy as np
 #             return True
 #         else:
 #             return False
+def top_boundary(x):
+    tol = 1E-14
+    return np.isclose(x[1], y_top, tol)
 
 
-# TODO
 # class BottomBoundary(SubDomain):
 #     """Determines if the point is at the bottom boundary with tolerance of
 #     1E-14.
@@ -73,6 +72,9 @@ import numpy as np
 #             return True
 #         else:
 #             return False
+def bottom_boundary(x):
+    tol = 1E-14
+    return np.isclose(x[1], y_bottom, tol)
 
 
 def determine_heat_flux(V_g, u, k, flux):
@@ -107,49 +109,67 @@ x_left = 0
 x_right = x_left + 1
 
 
-mesh = RectangleMesh(MPI.COMM_WORLD, np.array([[x_left, y_bottom, 0],[x_right, y_top, 1]]), [30,30])#, cell_type=CellType.triangle)
-V = FunctionSpace(mesh, 'P', 1)
-V_g = VectorFunctionSpace(mesh, 'P', 1)
+mesh = RectangleMesh(MPI.COMM_WORLD, np.array([[x_left, y_bottom, 0],[x_right, y_top, 1]]), [nx,ny])#, cell_type=CellType.triangle)
+scalar_element = FiniteElement("P", mesh.ufl_cell(), 1)
+vector_element = VectorElement("P", mesh.ufl_cell(), 1)
+V = FunctionSpace(mesh, scalar_element)
+V_g = FunctionSpace(mesh, vector_element)
+# V = FunctionSpace(mesh, 'P', 1)
+# V_g = VectorFunctionSpace(mesh, 'P', 1)
 
 alpha = 1  # m^2/s, https://en.wikipedia.org/wiki/Thermal_diffusivity
 k = 100  # kg * m / s^3 / K, https://en.wikipedia.org/wiki/Thermal_conductivity
 
 # Define boundary condition
-u_D = Constant('310')
-u_D_function = interpolate(u_D, V)
+u_D = Function(V)
+with u_D.vector.localForm() as loc:  # according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/ns_code2.html#boundary-conditions
+    loc.set(310)
+
 # We will only exchange flux in y direction on coupling interface. No initialization necessary.
 V_flux_y = V_g.sub(1)
 
-coupling_boundary = TopBoundary()
-bottom_boundary = BottomBoundary()
+# coupling_boundary = TopBoundary()
+coupling_boundary = top_boundary
+# bottom_boundary = BottomBoundary()
 
 # Define initial value
-u_n = interpolate(u_D, V)
-u_n.rename("T", "")
+u_n = Function(V, name="T")
+u_n.interpolate(u_D)
 
 # Adapter definition and initialization
-precice = Adapter(adapter_config_filename="precice-adapter-config.json")
+# precice = Adapter(adapter_config_filename="precice-adapter-config.json")  # TODO
 
-precice_dt = precice.initialize(coupling_boundary, read_function_space=V, write_object=V_flux_y)
+# precice_dt = precice.initialize(coupling_boundary, read_function_space=V, write_object=V_flux_y)  # TODO
 
 # Create a FEniCS Expression to define and control the coupling boundary values
-coupling_expression = precice.create_coupling_expression()
+# coupling_expression = precice.create_coupling_expression()  # TODO
 
 # Assigning appropriate dt
-dt = Constant(0)
-dt.assign(np.min([fenics_dt, precice_dt]))
+dt = Constant(mesh, 1)
+# dt.assign(np.min([fenics_dt, precice_dt])) TODO
 
 # Define variational problem
 u = TrialFunction(V)
 v = TestFunction(V)
-F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx
+# F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx
+# a, L = lhs(F), rhs(F)
+a = alpha * dot(grad(u), grad(v)) * dx + u * v / dt * dx
+L = u_n * v / dt * dx
 
 # apply constant Dirichlet boundary condition at bottom edge
 # apply Dirichlet boundary condition on coupling interface
-bcs = [DirichletBC(V, coupling_expression, coupling_boundary), DirichletBC(V, u_D, bottom_boundary)]
+# bcs = [DirichletBC(V, coupling_expression, coupling_boundary), DirichletBC(V, u_D, bottom_boundary)]  # TODO
+bcs = []
+dofs_bottom = locate_dofs_geometrical(V, bottom_boundary)
+bcs.append(DirichletBC(u_D, dofs_bottom))
 
-# TODO
-a, L = 0, 0  # lhs(F), rhs(F)
+dofs_coupling = locate_dofs_geometrical(V, coupling_boundary)
+value_coupling = Function(V)
+with value_coupling.vector.localForm() as loc:
+    loc.set(200)
+bcs.append(DirichletBC(value_coupling, dofs_bottom))
+
+
 
 # Time-stepping
 u_np1 = Function(V)
@@ -161,23 +181,17 @@ with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
     xdmf.write_mesh(mesh)
     xdmf.write_function(u_n, 0)
 
+    # trying to solve the problem
+    problem = LinearProblem(a, L, bcs=bcs) #, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+    u_np1 = problem.solve()
+    u_n.interpolate(u_np1)
+    xdmf.write_function(u_n, 1)
+    exit()
     
-# # mark mesh w.r.t ranks
-# ranks = File("Solid/VTK/ranks%s.pvd.pvd" % precice.get_participant_name())
-# mesh_rank = MeshFunction("size_t", mesh, mesh.topology().dim())
-# mesh_rank.set_all(MPI.rank(MPI.comm_world))
-# mesh_rank.rename("myRank", "")
-# ranks << mesh_rank
+    print("output vtk for time = {}".format(float(t)))
+    n = 0
 
-# # Create output file
-# file_out = File("Solid/VTK/%s.pvd" % precice.get_participant_name())
-# file_out << u_n
-
-# print("output vtk for time = {}".format(float(t)))
-# n = 0
-
-    fluxes = Function(V_g)
-    fluxes.rename("Fluxes", "")
+    fluxes = Function(V_g, name="Fluxes")
 
     while precice.is_coupling_ongoing():
 
