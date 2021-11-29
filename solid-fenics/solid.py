@@ -77,13 +77,12 @@ def bottom_boundary(x):
     return np.isclose(x[1], y_bottom, tol)
 
 
-def determine_heat_flux(V_g, u, k, flux):
+def determine_heat_flux(V_g, u, k):
     """
     compute flux following http://hplgit.github.io/INF5620/doc/pub/fenics_tutorial1.1/tu2.html#tut-poisson-gradu
     :param V_g: Vector function space
     :param u: solution where gradient is to be determined
     :param k: thermal conductivity
-    :param flux: returns calculated flux into this value
     """
 
     w = TrialFunction(V_g)
@@ -93,7 +92,7 @@ def determine_heat_flux(V_g, u, k, flux):
     L = inner(-k * grad(u), v) * dx
     # solve(a == L, flux)
     problem = LinearProblem(a, L) #, bcs=[bc], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
-    flux = problem.solve()
+    return problem.solve()
 
 
 # Create mesh and define function space
@@ -102,7 +101,7 @@ ny = 25
 nz = 1
 
 fenics_dt = 0.01  # time step size
-dt_out = 0.2  # interval for writing VTK files
+dt_out = 0.2  # interval for writing xdmf files
 y_top = 0
 y_bottom = y_top - .25
 x_left = 0
@@ -145,7 +144,7 @@ u_n.interpolate(u_D)
 # coupling_expression = precice.create_coupling_expression()  # TODO
 
 # Assigning appropriate dt
-dt = Constant(mesh, 1)
+dt = Constant(mesh, fenics_dt)
 # dt.assign(np.min([fenics_dt, precice_dt])) TODO
 
 # Define variational problem
@@ -167,7 +166,7 @@ dofs_coupling = locate_dofs_geometrical(V, coupling_boundary)
 value_coupling = Function(V)
 with value_coupling.vector.localForm() as loc:
     loc.set(200)
-bcs.append(DirichletBC(value_coupling, dofs_bottom))
+bcs.append(DirichletBC(value_coupling, dofs_coupling))
 
 
 
@@ -182,38 +181,42 @@ with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
     xdmf.write_function(u_n, 0)
 
     # trying to solve the problem
-    problem = LinearProblem(a, L, bcs=bcs) #, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
-    u_np1 = problem.solve()
-    u_n.interpolate(u_np1)
-    xdmf.write_function(u_n, 1)
-    exit()
+    # problem = LinearProblem(a, L, bcs=bcs) #, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+    # u_np1 = problem.solve()
+    # u_n.interpolate(u_np1)
+    # xdmf.write_function(u_n, 1)
     
-    print("output vtk for time = {}".format(float(t)))
+    print(f"output xdmf for time = {t}")
     n = 0
 
     fluxes = Function(V_g, name="Fluxes")
 
-    while precice.is_coupling_ongoing():
+    # while precice.is_coupling_ongoing():  # TODO
+    if True:
+        
+        # TODO
+        # if precice.is_action_required(precice.action_write_iteration_checkpoint()):  # write checkpoint
+        #     precice.store_checkpoint(u_n, t, n)
 
-        if precice.is_action_required(precice.action_write_iteration_checkpoint()):  # write checkpoint
-            precice.store_checkpoint(u_n, t, n)
-
-        read_data = precice.read_data()
+        # read_data = precice.read_data()  # TODO
 
         # Update the coupling expression with the new read data
-        precice.update_coupling_expression(coupling_expression, read_data)
+        # precice.update_coupling_expression(coupling_expression, read_data)  # TODO
 
-        dt.assign(np.min([fenics_dt, precice_dt]))
-
+        dt.value = np.min([fenics_dt]) # , precice_dt])  # TODO
         # Compute solution
         # solve(a == L, u_np1, bcs)
         problem = LinearProblem(a, L, bcs=bcs) #, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
         u_np1 = problem.solve()
 
         # Dirichlet problem obtains flux from solution and sends flux on boundary to Neumann problem
-        determine_heat_flux(V_g, u_np1, k, fluxes)
+        flux = determine_heat_flux(V_g, u_np1, k)
+        flux.name = "flux"
+        fluxes.interpolate(flux)  # TODO can we also use flux directly?
         fluxes_y = fluxes.sub(1)  # only exchange y component of flux.
-        precice.write_data(fluxes_y)
+        # precice.write_data(fluxes_y) # TODO
+        xdmf.write_function(fluxes)
+        exit()
 
         precice_dt = precice.advance(dt(0))
 
@@ -230,7 +233,7 @@ with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
         if precice.is_time_window_complete():
             tol = 10e-5  # we need some tolerance, since otherwise output might be skipped.
             if abs((t + tol) % dt_out) < 2 * tol:  # output if t is a multiple of dt_out
-                print("output vtk for time = {}".format(float(t)))
+                print(f"output xdmf for time = {t}")
                 xdmf.write_function(u_n, t)
 
         # Update dirichlet BC
