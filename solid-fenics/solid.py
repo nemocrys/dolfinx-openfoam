@@ -2,62 +2,77 @@
 Solid plate participant in flow-over-plate tutorial using FEniCS
 """
 
-from __future__ import print_function, division
-from fenics import Function, SubDomain, RectangleMesh, BoxMesh, FunctionSpace, VectorFunctionSpace, Point, \
-    Expression, Constant, DirichletBC, \
-    TrialFunction, TestFunction, File, solve, plot, lhs, rhs, grad, inner, dot, dx, ds, interpolate, project, \
-    near, MeshFunction, MPI
-from fenicsprecice import Adapter
+# import ufl
+# import dolfinx
+# import dolfinx.io
+# from mpi4py import MPI
+# from petsc4py import PETSc
+
+
+from mpi4py import MPI
+from dolfinx import Function, FunctionSpace, VectorFunctionSpace, Constant, DirichletBC
+from dolfinx.fem import LinearProblem
+from dolfinx.generation import RectangleMesh
+# from dolfinx.mesh import CellType  # TODO this should work according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/diffusion_code.html?highlight=rectangular
+from dolfinx.io import XDMFFile
+
+from ufl import TrialFunction, TestFunction, grad, inner, dot, dx
+# from dolfinx import interpolate, near, MeshFunction, rhs, lhs
+
+# from fenicsprecice import Adapter
 import numpy as np
 
 
-class ComplementaryBoundary(SubDomain):
-    """Determines if a point is at the complementary boundary with tolerance of
-    1E-14.
-    :func inside(): returns True if point belongs to the boundary, otherwise
-                    returns False
-    """
+# TODO
+# class ComplementaryBoundary(SubDomain):
+#     """Determines if a point is at the complementary boundary with tolerance of
+#     1E-14.
+#     :func inside(): returns True if point belongs to the boundary, otherwise
+#                     returns False
+#     """
 
-    def __init__(self, subdomain):
-        self.complement = subdomain
-        SubDomain.__init__(self)
+#     def __init__(self, subdomain):
+#         self.complement = subdomain
+#         SubDomain.__init__(self)
 
-    def inside(self, x, on_boundary):
-        tol = 1E-14
-        if on_boundary and not self.complement.inside(x, on_boundary):
-            return True
-        else:
-            return False
-
-
-class TopBoundary(SubDomain):
-    """Determines if the point is at the top boundary with tolerance of 1E-14.
-    :func inside(): returns True if point belongs to the boundary, otherwise
-                    returns False
-    """
-
-    def inside(self, x, on_boundary):
-        tol = 1E-14
-        if on_boundary and near(x[1], y_top, tol):
-            return True
-        else:
-            return False
+#     def inside(self, x, on_boundary):
+#         tol = 1E-14
+#         if on_boundary and not self.complement.inside(x, on_boundary):
+#             return True
+#         else:
+#             return False
 
 
-class BottomBoundary(SubDomain):
-    """Determines if the point is at the bottom boundary with tolerance of
-    1E-14.
+# TODO
+# class TopBoundary(SubDomain):
+#     """Determines if the point is at the top boundary with tolerance of 1E-14.
+#     :func inside(): returns True if point belongs to the boundary, otherwise
+#                     returns False
+#     """
 
-    :func inside(): returns True if point belongs to the boundary, otherwise
-                    returns False
-    """
+#     def inside(self, x, on_boundary):
+#         tol = 1E-14
+#         if on_boundary and near(x[1], y_top, tol):
+#             return True
+#         else:
+#             return False
 
-    def inside(self, x, on_boundary):
-        tol = 1E-14
-        if on_boundary and near(x[1], y_bottom, tol):
-            return True
-        else:
-            return False
+
+# TODO
+# class BottomBoundary(SubDomain):
+#     """Determines if the point is at the bottom boundary with tolerance of
+#     1E-14.
+
+#     :func inside(): returns True if point belongs to the boundary, otherwise
+#                     returns False
+#     """
+
+#     def inside(self, x, on_boundary):
+#         tol = 1E-14
+#         if on_boundary and near(x[1], y_bottom, tol):
+#             return True
+#         else:
+#             return False
 
 
 def determine_heat_flux(V_g, u, k, flux):
@@ -74,7 +89,9 @@ def determine_heat_flux(V_g, u, k, flux):
 
     a = inner(w, v) * dx
     L = inner(-k * grad(u), v) * dx
-    solve(a == L, flux)
+    # solve(a == L, flux)
+    problem = LinearProblem(a, L) #, bcs=[bc], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+    flux = problem.solve()
 
 
 # Create mesh and define function space
@@ -89,10 +106,8 @@ y_bottom = y_top - .25
 x_left = 0
 x_right = x_left + 1
 
-p0 = Point(x_left, y_bottom, 0)
-p1 = Point(x_right, y_top, 1)
 
-mesh = RectangleMesh(p0, p1, nx, ny)
+mesh = RectangleMesh(MPI.COMM_WORLD, np.array([[x_left, y_bottom, 0],[x_right, y_top, 1]]), [30,30])#, cell_type=CellType.triangle)
 V = FunctionSpace(mesh, 'P', 1)
 V_g = VectorFunctionSpace(mesh, 'P', 1)
 
@@ -133,70 +148,79 @@ F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx
 # apply Dirichlet boundary condition on coupling interface
 bcs = [DirichletBC(V, coupling_expression, coupling_boundary), DirichletBC(V, u_D, bottom_boundary)]
 
-a, L = lhs(F), rhs(F)
+# TODO
+a, L = 0, 0  # lhs(F), rhs(F)
 
 # Time-stepping
 u_np1 = Function(V)
 t = 0
 u_D.t = t + dt
 
-# mark mesh w.r.t ranks
-ranks = File("Solid/VTK/ranks%s.pvd.pvd" % precice.get_participant_name())
-mesh_rank = MeshFunction("size_t", mesh, mesh.topology().dim())
-mesh_rank.set_all(MPI.rank(MPI.comm_world))
-mesh_rank.rename("myRank", "")
-ranks << mesh_rank
 
-# Create output file
-file_out = File("Solid/VTK/%s.pvd" % precice.get_participant_name())
-file_out << u_n
+with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
+    xdmf.write_mesh(mesh)
+    xdmf.write_function(u_n, 0)
 
-print("output vtk for time = {}".format(float(t)))
-n = 0
+    
+# # mark mesh w.r.t ranks
+# ranks = File("Solid/VTK/ranks%s.pvd.pvd" % precice.get_participant_name())
+# mesh_rank = MeshFunction("size_t", mesh, mesh.topology().dim())
+# mesh_rank.set_all(MPI.rank(MPI.comm_world))
+# mesh_rank.rename("myRank", "")
+# ranks << mesh_rank
 
-fluxes = Function(V_g)
-fluxes.rename("Fluxes", "")
+# # Create output file
+# file_out = File("Solid/VTK/%s.pvd" % precice.get_participant_name())
+# file_out << u_n
 
-while precice.is_coupling_ongoing():
+# print("output vtk for time = {}".format(float(t)))
+# n = 0
 
-    if precice.is_action_required(precice.action_write_iteration_checkpoint()):  # write checkpoint
-        precice.store_checkpoint(u_n, t, n)
+    fluxes = Function(V_g)
+    fluxes.rename("Fluxes", "")
 
-    read_data = precice.read_data()
+    while precice.is_coupling_ongoing():
 
-    # Update the coupling expression with the new read data
-    precice.update_coupling_expression(coupling_expression, read_data)
+        if precice.is_action_required(precice.action_write_iteration_checkpoint()):  # write checkpoint
+            precice.store_checkpoint(u_n, t, n)
 
-    dt.assign(np.min([fenics_dt, precice_dt]))
+        read_data = precice.read_data()
 
-    # Compute solution
-    solve(a == L, u_np1, bcs)
+        # Update the coupling expression with the new read data
+        precice.update_coupling_expression(coupling_expression, read_data)
 
-    # Dirichlet problem obtains flux from solution and sends flux on boundary to Neumann problem
-    determine_heat_flux(V_g, u_np1, k, fluxes)
-    fluxes_y = fluxes.sub(1)  # only exchange y component of flux.
-    precice.write_data(fluxes_y)
+        dt.assign(np.min([fenics_dt, precice_dt]))
 
-    precice_dt = precice.advance(dt(0))
+        # Compute solution
+        # solve(a == L, u_np1, bcs)
+        problem = LinearProblem(a, L, bcs=bcs) #, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+        u_np1 = problem.solve()
 
-    if precice.is_action_required(precice.action_read_iteration_checkpoint()):  # roll back to checkpoint
-        u_cp, t_cp, n_cp = precice.retrieve_checkpoint()
-        u_n.assign(u_cp)
-        t = t_cp
-        n = n_cp
-    else:  # update solution
-        u_n.assign(u_np1)
-        t += float(dt)
-        n += 1
+        # Dirichlet problem obtains flux from solution and sends flux on boundary to Neumann problem
+        determine_heat_flux(V_g, u_np1, k, fluxes)
+        fluxes_y = fluxes.sub(1)  # only exchange y component of flux.
+        precice.write_data(fluxes_y)
 
-    if precice.is_time_window_complete():
-        tol = 10e-5  # we need some tolerance, since otherwise output might be skipped.
-        if abs((t + tol) % dt_out) < 2 * tol:  # output if t is a multiple of dt_out
-            print("output vtk for time = {}".format(float(t)))
-            file_out << u_n
+        precice_dt = precice.advance(dt(0))
 
-    # Update dirichlet BC
-    u_D.t = t + float(dt)
+        if precice.is_action_required(precice.action_read_iteration_checkpoint()):  # roll back to checkpoint
+            u_cp, t_cp, n_cp = precice.retrieve_checkpoint()
+            u_n.assign(u_cp)
+            t = t_cp
+            n = n_cp
+        else:  # update solution
+            u_n.assign(u_np1)
+            t += float(dt)
+            n += 1
+
+        if precice.is_time_window_complete():
+            tol = 10e-5  # we need some tolerance, since otherwise output might be skipped.
+            if abs((t + tol) % dt_out) < 2 * tol:  # output if t is a multiple of dt_out
+                print("output vtk for time = {}".format(float(t)))
+                xdmf.write_function(u_n, t)
+
+        # Update dirichlet BC
+        u_D.t = t + float(dt)
 
 # Hold plot
 precice.finalize()

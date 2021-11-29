@@ -9,4 +9,9 @@ groupmod -g $GROUP_ID user
 export HOME=/home/user
 
 source /usr/lib/openfoam/openfoam2106/etc/bashrc
+
+cd fenics-adapter
+pip3 install -e .
+cd ..
+
 exec /usr/sbin/gosu user "$@"

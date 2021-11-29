@@ -58,11 +58,14 @@ RUN source /usr/lib/openfoam/openfoam2106/etc/bashrc && \
         cd openfoam-adapter_v1.0.0_OpenFOAMv1812-v2012 && \
         ./Allwmake
 
+# Install pyprecice
+RUN pip3 install pyprecice==2.3.*
+
 RUN mkdir /home/workdir
 WORKDIR /home/workdir
 
 # modify user id and group
 # see https://techflare.blog/permission-problems-in-bind-mount-in-docker-volume/
-COPY  ./docker/entrypoint.sh /
 RUN apt-get -y install gosu 
+COPY  ./docker/entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]

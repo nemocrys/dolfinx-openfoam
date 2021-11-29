@@ -24,4 +24,4 @@ docker run -it --rm -v $PWD:/home/workdir -e LOCAL_UID=$(id -u $USER) -e LOCAL_G
 
 ## Acknowledgements
 
-This code is based on the preCICE tutorial [flow-over-heated-plate](https://github.com/precice/tutorials/tree/master/flow-over-heated-plate).
+This project is based on the preCICE tutorial [flow-over-heated-plate](https://github.com/precice/tutorials/tree/master/flow-over-heated-plate) and the preCICE [fenics-adapter](https://github.com/precice/fenics-adapter)
