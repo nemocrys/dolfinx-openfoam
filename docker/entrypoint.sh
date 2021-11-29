@@ -8,5 +8,5 @@ useradd -u $USER_ID -o -m user
 groupmod -g $GROUP_ID user
 export HOME=/home/user
 
-exec /usr/sbin/gosu user "$@"
 source /usr/lib/openfoam/openfoam2106/etc/bashrc
+exec /usr/sbin/gosu user "$@"
