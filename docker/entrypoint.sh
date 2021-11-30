@@ -10,8 +10,8 @@ export HOME=/home/user
 
 source /usr/lib/openfoam/openfoam2106/etc/bashrc
 
-cd fenics-adapter
+cd ../fenicsx-adapter
 pip3 install -e .
-cd ..
+cd ../workdir
 
 exec /usr/sbin/gosu user "$@"

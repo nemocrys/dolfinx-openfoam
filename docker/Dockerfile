@@ -61,7 +61,8 @@ RUN source /usr/lib/openfoam/openfoam2106/etc/bashrc && \
 # Install pyprecice
 RUN pip3 install pyprecice==2.3.*
 
-RUN mkdir /home/workdir
+RUN mkdir /home/workdir && \
+    mkdir /home/fenicsx-adapter
 WORKDIR /home/workdir
 
 # modify user id and group
