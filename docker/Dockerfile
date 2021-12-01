@@ -7,9 +7,9 @@
 # docker run -it --rm nemocrys/dolfinx-openfoam bash
 #
 # Run image and map current directory to home/workdir on Linux:
-# docker run -it --rm -v $PWD:/home/workdir -e LOCAL_UID=$(id -u $USER) -e LOCAL_GID=$(id -g $USER) nemocrys/dolfinx-openfoam bash
+# docker run -it --rm -v $PWD:/home/workdir -v $PWD/../fenicsx-adapter:/home/fenicsx-adapter -e LOCAL_UID=$(id -u $USER) -e LOCAL_GID=$(id -g $USER) nemocrys/dolfinx-openfoam bash
 # and on Windows:
-# docker run -it --rm -v ${PWD}:/home/workdir nemocrys/dolfinx-openfoam bash
+# docker run -it --rm -v ${PWD}:/home/workdir -v ${PWD}/../fenicsx-adapter:/home/fenicsx-adapter nemocrys/dolfinx-openfoam bash
 
 # FROM ubuntu:20.04
 FROM dolfinx/dolfinx:v0.2.0a0
