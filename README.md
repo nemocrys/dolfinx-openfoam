@@ -26,4 +26,4 @@ docker run -it --rm -v $PWD:/home/workdir -v $PWD/../fenicsx-adapter:/home/fenic
 
 ## Acknowledgements
 
-This project is based on the preCICE tutorial [flow-over-heated-plate](https://github.com/precice/tutorials/tree/master/flow-over-heated-plate).
+This project is based on the preCICE tutorial [flow-over-heated-plate](https://github.com/precice/tutorials/tree/master/flow-over-heated-plate and on the [dofinx dockerfile](https://github.com/FEniCS/dolfinx/blob/main/docker/Dockerfile).

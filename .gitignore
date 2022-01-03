@@ -3,3 +3,4 @@ fluid-openfoam/constant/polyMesh/
 fluid-openfoam/fluid-openfoam.foam
 *.xdmf
 *.h5
+.cache/

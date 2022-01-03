@@ -10,9 +10,8 @@ Solid plate participant in flow-over-plate tutorial using FEniCS
 
 
 from mpi4py import MPI
-from dolfinx import Function, FunctionSpace, VectorFunctionSpace, Constant, DirichletBC
-from dolfinx.fem import LinearProblem, locate_dofs_geometrical
-from dolfinx.generation import RectangleMesh
+from dolfinx.fem import Function, FunctionSpace, VectorFunctionSpace, Constant, DirichletBC, LinearProblem, locate_dofs_geometrical
+from dolfinx.mesh import create_rectangle
 # from dolfinx.mesh import CellType  # this should work according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/diffusion_code.html?highlight=rectangular
 from dolfinx.io import XDMFFile
 
@@ -108,7 +107,7 @@ x_left = 0
 x_right = x_left + 1
 
 
-mesh = RectangleMesh(MPI.COMM_WORLD, np.array([[x_left, y_bottom, 0],[x_right, y_top, 1]]), [nx,ny])#, cell_type=CellType.triangle)
+mesh = create_rectangle(MPI.COMM_WORLD, [[x_left, y_bottom],[x_right, y_top]], [nx,ny])#, cell_type=CellType.triangle)
 scalar_element = FiniteElement("P", mesh.ufl_cell(), 1)
 vector_element = VectorElement("P", mesh.ufl_cell(), 1)
 V = FunctionSpace(mesh, scalar_element)
