@@ -466,4 +466,5 @@ WORKDIR /home/workdir
 # see https://techflare.blog/permission-problems-in-bind-mount-in-docker-volume/
 RUN apt-get -y install gosu 
 COPY  ./docker/entrypoint.sh /
+RUN ["chmod", "+x", "/entrypoint.sh"]
 ENTRYPOINT [ "/entrypoint.sh" ]
