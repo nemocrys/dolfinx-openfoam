@@ -10,15 +10,15 @@ Solid plate participant in flow-over-plate tutorial using FEniCS
 
 
 from mpi4py import MPI
-from dolfinx.fem import Function, FunctionSpace, VectorFunctionSpace, Constant, DirichletBC, LinearProblem, locate_dofs_geometrical
+from dolfinx.fem import Function, FunctionSpace, VectorFunctionSpace, Constant, dirichletbc, LinearProblem, locate_dofs_geometrical
 from dolfinx.mesh import create_rectangle
 # from dolfinx.mesh import CellType  # this should work according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/diffusion_code.html?highlight=rectangular
 from dolfinx.io import XDMFFile
 
-from ufl import FiniteElement, VectorElement, TrialFunction, TestFunction, grad, inner, dot, dx
+from ufl import FiniteElement, VectorElement, TrialFunction, TestFunction, grad, inner, dot, dx, lhs, rhs
 # from dolfinx import interpolate, near, MeshFunction, rhs, lhs
 
-# from fenicsprecice import Adapter
+from fenicsxprecice import Adapter
 import numpy as np
 
 
@@ -121,10 +121,14 @@ k = 100  # kg * m / s^3 / K, https://en.wikipedia.org/wiki/Thermal_conductivity
 # Define boundary condition
 u_D = Function(V)
 with u_D.vector.localForm() as loc:  # according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/ns_code2.html#boundary-conditions
-    loc.set(310)
+    loc.set(310.0)
 
 # We will only exchange flux in y direction on coupling interface. No initialization necessary.
-V_flux_y = V_g.sub(1)
+V_flux_y = V_g.sub(1) # TODO .collapse() in partitioned heat equation
+# coupling function
+f_N = Function(V)
+with f_N.vector.localForm() as loc:
+    loc.set(0.0)
 
 # coupling_boundary = TopBoundary()
 coupling_boundary = top_boundary
@@ -135,39 +139,31 @@ u_n = Function(V, name="T")
 u_n.interpolate(u_D)
 
 # Adapter definition and initialization
-# precice = Adapter(adapter_config_filename="precice-adapter-config.json")  # TODO
+precice = Adapter(MPI.COMM_WORLD, V, adapter_config_filename="precice-adapter-config.json")
 
-# precice_dt = precice.initialize(coupling_boundary, read_function_space=V, write_object=V_flux_y)  # TODO
-
+precice_dt = precice.initialize(coupling_boundary, read_function_space=V, write_object=f_N)
 # Create a FEniCS Expression to define and control the coupling boundary values
-# coupling_expression = precice.create_coupling_expression()  # TODO
+coupling_expression = precice.create_coupling_expression()
 
 # Assigning appropriate dt
-dt = Constant(mesh, fenics_dt)
-# dt.assign(np.min([fenics_dt, precice_dt])) TODO
+dt = Constant(mesh, 0.0)
+dt.value = np.min([fenics_dt, precice_dt])
 
 # Define variational problem
 u = TrialFunction(V)
 v = TestFunction(V)
-# F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx
-# a, L = lhs(F), rhs(F)
-a = alpha * dot(grad(u), grad(v)) * dx + u * v / dt * dx
-L = u_n * v / dt * dx
+F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx
+a, L = lhs(F), rhs(F)
+# a = alpha * dot(grad(u), grad(v)) * dx + u * v / dt * dx
+# L = u_n * v / dt * dx
 
 # apply constant Dirichlet boundary condition at bottom edge
 # apply Dirichlet boundary condition on coupling interface
-# bcs = [DirichletBC(V, coupling_expression, coupling_boundary), DirichletBC(V, u_D, bottom_boundary)]  # TODO
 bcs = []
-dofs_bottom = locate_dofs_geometrical(V, bottom_boundary)
-bcs.append(DirichletBC(u_D, dofs_bottom))
-
 dofs_coupling = locate_dofs_geometrical(V, coupling_boundary)
-value_coupling = Function(V)
-with value_coupling.vector.localForm() as loc:
-    loc.set(200)
-bcs.append(DirichletBC(value_coupling, dofs_coupling))
-
-
+bcs.append(dirichletbc(coupling_expression, dofs_coupling))
+dofs_bottom = locate_dofs_geometrical(V, bottom_boundary)
+bcs.append(dirichletbc(u_D, dofs_bottom))
 
 # Time-stepping
 u_np1 = Function(V)
@@ -178,55 +174,42 @@ u_D.t = t + dt
 with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
     xdmf.write_mesh(mesh)
     xdmf.write_function(u_n, 0)
-
-    # trying to solve the problem
-    # problem = LinearProblem(a, L, bcs=bcs) #, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
-    # u_np1 = problem.solve()
-    # u_n.interpolate(u_np1)
-    # xdmf.write_function(u_n, 1)
     
     print(f"output xdmf for time = {t}")
     n = 0
 
     fluxes = Function(V_g, name="Fluxes")
 
-    # while precice.is_coupling_ongoing():  # TODO
-    if True:
-        
-        # TODO
-        # if precice.is_action_required(precice.action_write_iteration_checkpoint()):  # write checkpoint
-        #     precice.store_checkpoint(u_n, t, n)
-
-        # read_data = precice.read_data()  # TODO
+    while precice.is_coupling_ongoing(): 
+        if precice.is_action_required(precice.action_write_iteration_checkpoint()):  # write checkpoint
+            precice.store_checkpoint(u_n, t, n)
+        read_data = precice.read_data()
 
         # Update the coupling expression with the new read data
-        # precice.update_coupling_expression(coupling_expression, read_data)  # TODO
+        precice.update_coupling_expression(coupling_expression, read_data)
 
-        dt.value = np.min([fenics_dt]) # , precice_dt])  # TODO
+        dt.value = np.min([fenics_dt, precice_dt])
         # Compute solution
         # solve(a == L, u_np1, bcs)
         problem = LinearProblem(a, L, bcs=bcs) #, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
         u_np1 = problem.solve()
-
         # Dirichlet problem obtains flux from solution and sends flux on boundary to Neumann problem
         flux = determine_heat_flux(V_g, u_np1, k)
         flux.name = "flux"
         fluxes.interpolate(flux)  # TODO can we also use flux directly?
         fluxes_y = fluxes.sub(1)  # only exchange y component of flux.
-        # precice.write_data(fluxes_y) # TODO
-        xdmf.write_function(fluxes)
-        exit()
+        precice.write_data(fluxes_y)
 
-        precice_dt = precice.advance(dt(0))
+        precice_dt = precice.advance(dt.value)
 
         if precice.is_action_required(precice.action_read_iteration_checkpoint()):  # roll back to checkpoint
             u_cp, t_cp, n_cp = precice.retrieve_checkpoint()
-            u_n.assign(u_cp)
+            u_n.interpolate(u_cp)
             t = t_cp
             n = n_cp
         else:  # update solution
-            u_n.assign(u_np1)
-            t += float(dt)
+            u_n.interpolate(u_np1)
+            t += dt.value
             n += 1
 
         if precice.is_time_window_complete():
@@ -235,8 +218,4 @@ with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
                 print(f"output xdmf for time = {t}")
                 xdmf.write_function(u_n, t)
 
-        # Update dirichlet BC
-        u_D.t = t + float(dt)
-
-# Hold plot
 precice.finalize()
