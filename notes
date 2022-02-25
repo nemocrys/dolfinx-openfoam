@@ -1,5 +1,0 @@
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PETSC_DIR
-
-/usr/bin/ld: warning: libpetsc.so.3.16, needed by /usr/local/lib/libprecice.so.2.3.0, not found (try using -rpath or -rpath-link)
-ENV PETSC_DIR=/usr/local/petsc
-/usr/local/petsc/linux-gnu-real-64/lib

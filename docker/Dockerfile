@@ -462,6 +462,9 @@ RUN mkdir /home/workdir && \
     mkdir /home/fenicsx-adapter
 WORKDIR /home/workdir
 
+# install precice config visualizer
+RUN pip3 install https://github.com/precice/config-visualizer/archive/master.zip
+
 # modify user id and group #TODO doesn't work yet
 # see https://techflare.blog/permission-problems-in-bind-mount-in-docker-volume/
 RUN apt-get -y install gosu 
