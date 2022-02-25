@@ -99,7 +99,7 @@ nx = 100
 ny = 25
 nz = 1
 
-fenics_dt = 0.01  # time step size
+fenics_dt = 1.0 #0.01  # time step size
 dt_out = 0.2  # interval for writing xdmf files
 y_top = 0
 y_bottom = y_top - .25
@@ -152,9 +152,10 @@ dt.value = np.min([fenics_dt, precice_dt])
 # Define variational problem
 u = TrialFunction(V)
 v = TestFunction(V)
-# F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx  # transient
-F = alpha * dot(grad(u), grad(v)) * dx
+F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx
 a, L = lhs(F), rhs(F)
+# a = alpha * dot(grad(u), grad(v)) * dx + u * v / dt * dx
+# L = u_n * v / dt * dx
 
 # apply constant Dirichlet boundary condition at bottom edge
 # apply Dirichlet boundary condition on coupling interface

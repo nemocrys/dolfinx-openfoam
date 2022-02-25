@@ -3,6 +3,7 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      preciceDict;
 }
 
@@ -16,19 +17,17 @@ interfaces
 {
   Interface1
   {
-    mesh              Fluid-Interface;
+    mesh              Fluid-Mesh;
     patches           (interface);
     
     readData
     (
-      Sink-Temperature-Solid
-      Heat-Transfer-Coefficient-Solid
+      Heat-Flux
     );
     
     writeData
     (
-      Sink-Temperature-Fluid
-      Heat-Transfer-Coefficient-Fluid
+      Temperature
     );
   };
 };

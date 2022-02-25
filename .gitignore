@@ -4,3 +4,5 @@ fluid-openfoam/fluid-openfoam.foam
 *.xdmf
 *.h5
 .cache/
+solid-fenics/precice-Solid-events.json
+fluid-openfoam/precice-Fluid-events.json

@@ -1,49 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  5                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       volScalarField;
+    location    "0";
     object      k;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
+dimensions      [ 0 2 -2 0 0 0 0 ];
 
-internalField   uniform 0;
+internalField   uniform 0.1;
 
 boundaryField
 {
+    interface
+    {
+        type            kqRWallFunction;
+        value           uniform 0.1;
+    }
     inlet
     {
-        type            fixedValue;
-        value           uniform 0;
+        type            kqRWallFunction;
+        value           uniform 0.1;
     }
     outlet
     {
-        type            fixedValue;
-        value           uniform 0;
+        type            kqRWallFunction;
+        value           uniform 0.1;
     }
     top
     {
-        type            fixedValue;
-        value           uniform 0;
+        type            kqRWallFunction;
+        value           uniform 0.1;
     }
     slip-bottom
     {
-        type            fixedValue;
-        value           uniform 0;
+        type            kqRWallFunction;
+        value           uniform 0.1;
     }
     bottom
     {
-        type            fixedValue;
-        value           uniform 0;
-    }
-    interface
-    {
-        type            fixedValue;
-        value           uniform 0;
+        type            kqRWallFunction;
+        value           uniform 0.1;
     }
     defaultFaces
     {
         type            empty;
     }
 }
+
+
+// ************************************************************************* //
