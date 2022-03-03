@@ -152,8 +152,7 @@ dt.value = np.min([fenics_dt, precice_dt])
 # Define variational problem
 u = TrialFunction(V)
 v = TestFunction(V)
-# F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx  # transient
-F = alpha * dot(grad(u), grad(v)) * dx
+F = u * v / dt * dx + alpha * dot(grad(u), grad(v)) * dx - u_n * v / dt * dx
 a, L = lhs(F), rhs(F)
 
 # apply constant Dirichlet boundary condition at bottom edge

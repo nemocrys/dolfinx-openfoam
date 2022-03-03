@@ -320,9 +320,21 @@ WORKDIR /root
 #     git clone -b ${UFL_VERSION} --single-branch https://github.com/FEniCS/ufl.git && \
 #     git clone -b ${FENICS_VERSION} --single-branch https://github.com/FEniCS/ffcx.git
 RUN git clone https://github.com/FEniCS/dolfinx.git && \
+    cd dolfinx && \
+    git checkout 358470227bf9b7dea179fca52fbd36182a277010 && \
+    cd .. && \
     git clone https://github.com/FEniCS/basix.git && \
+    cd basix && \
+    git checkout a5dc28dc4ed33e12518d8460b9d85b9f2da108d8 && \
+    cd .. && \
     git clone https://github.com/FEniCS/ufl.git && \
-    git clone https://github.com/FEniCS/ffcx.git
+    cd ufl && \
+    git checkout 1de7f12a2677a3a0c48cf0acd45e43a13de93b28 && \
+    cd .. && \
+    git clone https://github.com/FEniCS/ffcx.git && \
+    cd ffcx && \
+    git checkout e4e9991af51bbe39bec9a82b62b2987fe3a0c0e4 && \
+    cd ..
 
 ARG DOLFINX_CMAKE_BUILD_TYPE="RelWithDebInfo"
 # install
