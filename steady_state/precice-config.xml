@@ -50,7 +50,8 @@
     <coupling-scheme:serial-explicit>
       <time-window-size value="1" />
       <!-- <max-time-windows value="2023" /> -->
-      <max-time-windows value="3000" />
+      <!-- <max-time-windows value="3000" /> -->
+      <max-time-windows value="100" />
       <participants first="Solid" second="Fluid" />
       <exchange data="Temperature" mesh="Fluid-Mesh" from="Fluid" to="Solid" />
       <exchange data="Heat-Flux" mesh="Solid-Mesh" from="Solid" to="Fluid" />
@@ -58,12 +59,12 @@
 
     <!-- <coupling-scheme:serial-implicit>
       <time-window-size value="1.0" />
-      <max-time value="2.0" />
-      <max-iterations value="500" />
-      <participants first="Fluid" second="Solid" />
+      <max-time value="1.0" />
+      <max-iterations value="3000" />
+      <participants first="Solid" second="Fluid" />
       <exchange data="Temperature" mesh="Fluid-Mesh" from="Fluid" to="Solid" />
       <exchange data="Heat-Flux" mesh="Solid-Mesh" from="Solid" to="Fluid" />
-      <relative-convergence-measure limit="1.0e-5" data="Temperature" mesh="Fluid-Mesh" />
+      <relative-convergence-measure limit="1.0e-13" data="Temperature" mesh="Fluid-Mesh" />
       <acceleration:aitken>
         <data mesh="Solid-Mesh" name="Heat-Flux" />
         <initial-relaxation value="0.5" />

@@ -10,12 +10,13 @@ Solid plate participant in flow-over-plate tutorial using FEniCS
 
 
 from mpi4py import MPI
-from dolfinx.fem import Function, FunctionSpace, VectorFunctionSpace, Constant, dirichletbc, LinearProblem, locate_dofs_geometrical
+from dolfinx.fem import Function, FunctionSpace, VectorFunctionSpace, Constant, dirichletbc, locate_dofs_geometrical, form
+from dolfinx.fem.petsc import LinearProblem, assemble_matrix, assemble_vector, create_vector
 from dolfinx.mesh import create_rectangle
 # from dolfinx.mesh import CellType  # this should work according to https://jorgensd.github.io/dolfinx-tutorial/chapter2/diffusion_code.html?highlight=rectangular
 from dolfinx.io import XDMFFile
 
-from ufl import FiniteElement, VectorElement, TrialFunction, TestFunction, grad, inner, dot, dx, lhs, rhs
+from ufl import FiniteElement, VectorElement, TrialFunction, TestFunction, grad, inner, dot, dx, lhs, rhs, FacetNormal, Measure
 # from dolfinx import interpolate, near, MeshFunction, rhs, lhs
 
 from fenicsxprecice import Adapter
@@ -139,7 +140,7 @@ u_n = Function(V, name="T")
 u_n.interpolate(u_D)
 
 # Adapter definition and initialization
-precice = Adapter(MPI.COMM_WORLD, V, adapter_config_filename="precice-adapter-config.json")
+precice = Adapter(MPI.COMM_WORLD, adapter_config_filename="precice-adapter-config.json")
 
 precice_dt = precice.initialize(coupling_boundary, read_function_space=V, write_object=f_N)
 # Create a FEniCS Expression to define and control the coupling boundary values
@@ -170,6 +171,60 @@ u_np1 = Function(V)
 t = 0
 u_D.t = t + dt
 
+####################
+# Computation of heat flux
+dA = Measure(
+    "ds",
+    domain=mesh,
+    # subdomain_data=facet_tags,
+    metadata={"quadrature_degree": 2, "quadrature_scheme": "uflacs"},
+)
+normal = FacetNormal(mesh)
+def determine_heat_flux_scalar(V, u, kappa):
+    """
+    :param V_g: Vector function space
+    :param u: solution where gradient is to be determined
+    :param k: thermal conductivity
+    """
+    w = TrialFunction(V)
+    v = TestFunction(V)
+
+
+    a = w * v * dA
+    L = kappa * abs(inner(grad(u), normal))* v * dA #TODO Don't use abs!
+    # L = -kappa * grad(u)[1]* v * dA
+
+    dofs = locate_dofs_geometrical(V, coupling_boundary)
+
+    A = assemble_matrix(form(a))
+    A.assemble()
+    A = A[dofs, dofs]
+    b = create_vector(form(L))
+    assemble_vector(b, form(L))
+    b = b[dofs]
+
+    uh = Function(V)
+    with uh.vector.localForm() as loc:
+        loc.set(0.0)
+
+    # # solve with PETSc  # TODO
+    # from petsc4py import PETSc
+    # solver = PETSc.KSP().create()
+    # solver.setOperators(A)
+    # solver.setType(PETSc.KSP.Type.PREONLY)
+    # solver.getPC().setType(PETSc.PC.Type.LU)
+    # solver.solve(b, uh.vector[dofs])
+    # uh.x.scatter_forward()
+    
+    # solve with scipy
+    from scipy.linalg import solve
+    with uh.vector.localForm() as loc:
+        values = loc.getArray()
+        sol = solve(A, b)
+        values[dofs] = sol
+
+    return uh
+
 
 with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
     xdmf.write_mesh(mesh)
@@ -198,7 +253,9 @@ with XDMFFile(MPI.COMM_WORLD, "result.xdmf", "w") as xdmf:
         flux.name = "flux"
         fluxes.interpolate(flux)  # TODO can we also use flux directly?
         fluxes_y = fluxes.sub(1)  # only exchange y component of flux.
-        precice.write_data(fluxes_y)
+        # precice.write_data(fluxes_y)
+        flux_scalar = determine_heat_flux_scalar(V, u_np1, k)
+        precice.write_data(flux_scalar)
 
         precice_dt = precice.advance(dt.value)
 
