@@ -65,6 +65,6 @@ cd ../fluid-openfoam
 This project is based on the preCICE tutorial [flow-over-heated-plate](https://github.com/precice/tutorials/tree/master/flow-over-heated-plate) and on the [dofinx dockerfile](https://github.com/FEniCS/dolfinx/blob/main/docker/Dockerfile).
 
 
-[This project](https://www.researchgate.net/project/NEMOCRYS-Next-Generation-Multiphysical-Models-for-Crystal-Growth-Processes) has received funding from the European Research Council (ERC) under the European Union's Horizon 2020 research and innovation programme (grant agreement No 851768).
+[This project](https://nemocrys.github.io/) has received funding from the European Research Council (ERC) under the European Union's Horizon 2020 research and innovation programme (grant agreement No 851768).
 
 <img src="https://raw.githubusercontent.com/nemocrys/pyelmer/master/EU-ERC.png">
